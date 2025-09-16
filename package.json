@@ -1,6 +1,7 @@
 {
   "name": "proxy-browser",
   "version": "1.0.0",
+  "description": "A simple web proxy browser using Express and http-proxy-middleware",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
