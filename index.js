@@ -3,7 +3,43 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
 
-// Serve the main proxy browser page
+// Track active users
+let activeUsers = 0;
+const MAX_USERS = 20; // max concurrent users
+
+// Simple URL validation
+function isValidUrl(url) {
+  return url.startsWith('http://') || url.startsWith('https://');
+}
+
+// Proxy middleware
+const proxy = createProxyMiddleware({
+  target: 'https://example.com', // default target
+  changeOrigin: true,
+  ws: true,
+  router: (req) => {
+    const url = req.query.url;
+    if (url && isValidUrl(decodeURIComponent(url))) {
+      return decodeURIComponent(url);
+    }
+    return 'https://example.com';
+  },
+  onProxyReq: (proxyReq) => {
+    proxyReq.removeHeader('cookie'); // optional
+  }
+});
+
+// Limit concurrent users
+app.use('/proxy', (req, res, next) => {
+  if (activeUsers >= MAX_USERS) {
+    return res.send("Server busy, please try again later.");
+  }
+  activeUsers++;
+  res.on('finish', () => activeUsers--);
+  next();
+}, proxy);
+
+// Serve the frontend “proxy browser”
 app.get('/', (req, res) => {
   res.send(`
     <html>
@@ -39,23 +75,6 @@ app.get('/', (req, res) => {
     </html>
   `);
 });
-
-// Proxy middleware
-const proxy = createProxyMiddleware({
-  target: 'http://example.com', // placeholder, dynamically overridden
-  changeOrigin: true,
-  ws: true,
-  router: (req) => {
-    const url = req.query.url;
-    if (url) return decodeURIComponent(url);
-    return 'http://example.com';
-  },
-  onProxyReq: (proxyReq) => {
-    proxyReq.removeHeader('cookie'); // optional: reduce cookie issues
-  }
-});
-
-app.use('/proxy', proxy);
 
 // Start server
 const port = process.env.PORT || 8080;
